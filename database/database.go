@@ -1,75 +1,20 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
 
 	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-const url = "tester:secret@tcp(localhost:3306)/test"
-
-var db *sql.DB
-
-func Connect() {
-	connection, err := sql.Open("mysql", url)
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Println("Connecting...")
-	db = connection
-}
-
-func Close() {
-	db.Close()
-	fmt.Println("Disconnecting...")
-
-}
-
-func ExistTable(tableName string) bool {
-	sql := fmt.Sprintf("SHOW TABLES LIKE '%s'", tableName)
-	rows, err := db.Query(sql)
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	return rows.Next()
-}
-
-func CreateTable(schema string, name string) {
-	if !ExistTable(name) {
-		_, err := db.Exec(schema)
-		if err != nil {
-			panic(err)
-		} else {
-			fmt.Println("Success")
-		}
+var dsn = "tester:secret@tcp(localhost:3306)/test?charset=utf8mb4&parseTime=True&loc=Local"
+var Database = func() (db *gorm.DB) {
+	if db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{}); err != nil {
+		fmt.Printf("Error en la conexion", err)
+		panic(err)
 	} else {
-		fmt.Println("This table already exist.")
+		fmt.Println("Conexion exitosa")
+		return db
 	}
-}
-
-func TruncateTable(tableName string) {
-	sql := fmt.Sprintf("TRUNCATE %s", tableName)
-	db.Exec(sql)
-}
-
-func Exec(query string, args ...interface{}) (sql.Result, error) {
-	Connect()
-	result, err := db.Exec(query, args...)
-	Close()
-	if err != nil {
-		fmt.Println(err)
-	}
-	return result, err
-}
-
-func Query(query string, args ...interface{}) (*sql.Rows, error) {
-	Connect()
-	rows, err := db.Query(query, args...)
-	Close()
-	if err != nil {
-		fmt.Println(err)
-	}
-	return rows, err
-}
+}()

@@ -2,93 +2,92 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
+	"gorm/database"
+	"gorm/models"
 	"net/http"
 	"strconv"
-	"users/database"
-	"users/models"
 
 	"github.com/gorilla/mux"
+	"gorm.io/gorm"
 )
 
 func GetUsers(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
-	database.Connect()
-	users := models.ListUsers()
-	database.Close()
+	users := models.Users{}
+	database.Database.Find(&users)
+	sendData(rw, users, http.StatusOK)
 
-	output, err := json.Marshal(users)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	fmt.Fprintln(rw, string(output))
 }
 
 func GetUser(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
-	database.Connect()
+	user, err := getUserById(r)
+	if err != nil {
+		sendError(rw, http.StatusNotFound)
+	} else {
+		sendData(rw, user, http.StatusOK)
+
+	}
+}
+
+func getUserById(r *http.Request) (models.User, *gorm.DB) {
 	vars := mux.Vars(r)
 	userId, _ := strconv.Atoi(vars["id"])
-	user := models.GetUser(userId)
-	database.Close()
-	output, err := json.Marshal(user)
-	if err != nil {
-		fmt.Println(err.Error())
+
+	user := models.User{}
+	err := database.Database.First(&user, userId)
+
+	if err.Error != nil {
+		return user, err
+	} else {
+		return user, nil
 	}
-	fmt.Fprintln(rw, string(output))
 }
 
 func CreateUser(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
-
 	user := models.User{}
-
 	decoder := json.NewDecoder(r.Body)
 
-	if err := decoder.Decode(&user); err != nil {
-		fmt.Fprintln(rw, http.StatusUnprocessableEntity)
-
+	err := decoder.Decode(&user)
+	if err != nil {
+		sendError(rw, http.StatusUnprocessableEntity)
 	} else {
-		database.Connect()
-		user.Save()
-		database.Close()
+		database.Database.Save(&user)
+		sendData(rw, user, http.StatusCreated)
 	}
-	output, _ := json.Marshal(user)
-	fmt.Fprintf(rw, string(output))
 
 }
 
 func UpdateUser(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
 
-	user := models.User{}
+	var userId int64
 
-	decoder := json.NewDecoder(r.Body)
+	oldUser, err := getUserById(r)
 
-	if err := decoder.Decode(&user); err != nil {
-		fmt.Fprintln(rw, http.StatusUnprocessableEntity)
-
+	if err != nil {
+		sendError(rw, http.StatusNotFound)
 	} else {
-		database.Connect()
-		user.Save()
-		database.Close()
-	}
-	output, _ := json.Marshal(user)
-	fmt.Fprintf(rw, string(output))
+		userId = oldUser.Id
 
+		user := models.User{}
+		decoder := json.NewDecoder(r.Body)
+
+		err := decoder.Decode(&user)
+		if err != nil {
+			sendError(rw, http.StatusUnprocessableEntity)
+		} else {
+			user.Id = userId
+			database.Database.Save(&user)
+			sendData(rw, user, http.StatusCreated)
+		}
+	}
 }
 
 func DeleteUser(rw http.ResponseWriter, r *http.Request) {
-	rw.Header().Set("Content-Type", "application/json")
+	user, err := getUserById(r)
+	if err != nil {
+		sendError(rw, http.StatusNotFound)
+	} else {
+		database.Database.Delete(&user)
+		sendData(rw, user, http.StatusOK)
+	}
 
-	database.Connect()
-	vars := mux.Vars(r)
-	userId, _ := strconv.Atoi(vars["id"])
-
-	user := models.GetUser(userId)
-	user.Delete()
-	database.Close()
-
-	output, _ := json.Marshal(user)
-	fmt.Fprintf(rw, string(output))
 }
